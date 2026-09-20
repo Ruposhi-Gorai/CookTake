@@ -6,15 +6,33 @@ import { ArrowRight, CheckCircle, Mail } from "lucide-react";
 export default function WaitlistHero() {
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
-    // API call goes here
-    console.log(email);
+    try {
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const result = await response.json();
 
-    setJoined(true);
-    setEmail("");
+      if (!response.ok) {
+        throw new Error(result.message);
+      }
+
+      setJoined(true);
+      setEmail("");
+    } catch (submissionError) {
+      setError(submissionError.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -71,12 +89,14 @@ export default function WaitlistHero() {
 
                   <button
                     type="submit"
+                    disabled={isSubmitting}
                     className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-green-600 px-7 font-semibold text-white transition hover:bg-green-700"
                   >
-                    Join Waitlist
+                    {isSubmitting ? "Joining..." : "Join Waitlist"}
                     <ArrowRight size={18} />
                   </button>
                 </div>
+                {error && <p className="px-3 pt-3 text-sm text-red-600">{error}</p>}
               </form>
             )}
           </div>
