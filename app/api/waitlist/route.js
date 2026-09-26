@@ -1,38 +1,52 @@
-import { db } from "@/app/lib/firebase";
 import {
-  addDoc,
-  collection,
-  getDocs,
-  query,
-  serverTimestamp,
-  where,
-} from "firebase/firestore";
+  adminDb,
+  FieldValue,
+  isFirebaseAdminConfigured,
+} from "@/app/lib/firebase-admin";
+
+export const runtime = "nodejs";
 
 export async function POST(request) {
   try {
     const { email } = await request.json();
     const normalizedEmail = email?.trim().toLowerCase();
 
-    if (!normalizedEmail) {
-      return Response.json({ message: "Email is required" }, { status: 400 });
+    if (!normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      return Response.json({ message: "Enter a valid email address." }, { status: 400 });
     }
 
-    const waitlist = collection(db, "waitlist");
-    const existing = await getDocs(
-      query(waitlist, where("email", "==", normalizedEmail))
+    if (!isFirebaseAdminConfigured) {
+      return Response.json(
+        { message: "Waitlist is temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+
+    const waitlistEntry = adminDb
+      .collection("waitlist")
+      .doc(encodeURIComponent(normalizedEmail));
+
+    try {
+      await waitlistEntry.create({
+        email: normalizedEmail,
+        createdAt: FieldValue.serverTimestamp(),
+        source: "homepage",
+      });
+    } catch (error) {
+      if (error.code === 6 || error.code === "already-exists") {
+        return Response.json({
+          message: "You are already on the CookReady waitlist!",
+          alreadyJoined: true,
+        });
+      }
+
+      throw error;
+    }
+
+    return Response.json(
+      { message: "You are on the CookReady waitlist!" },
+      { status: 201 }
     );
-
-    if (!existing.empty) {
-      return Response.json({ message: "You are already on the waitlist." });
-    }
-
-    await addDoc(waitlist, {
-      email: normalizedEmail,
-      createdAt: serverTimestamp(),
-      source: "homepage",
-    });
-
-    return Response.json({ message: "Welcome to Cooktake!" }, { status: 201 });
   } catch (error) {
     console.error("Unable to add waitlist entry:", error);
     return Response.json(

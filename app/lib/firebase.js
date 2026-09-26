@@ -7,6 +7,12 @@ const firebaseConfig = {
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
 };
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean);
 
-export const db = getFirestore(app);
+const app = isFirebaseConfigured
+  ? getApps().length
+    ? getApps()[0]
+    : initializeApp(firebaseConfig)
+  : null;
+
+export const db = app ? getFirestore(app) : null;
